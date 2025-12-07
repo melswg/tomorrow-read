@@ -8,16 +8,16 @@ from telegram.ext import (
 )
 from telegram.error import TelegramError
 import os
-from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 import json
 import asyncio
+import pytz
 
 # Конфигурация
-TOKEN = "BOT_TOKEN" # не забыть вставить
+TOKEN = "8471745790:AAFZIf47RHjj0adBiuIAlL_06hioSipVAYA"
 IMAGES_DIR = "data/images"
 CLUES_FILE = "data/clues.txt"
-TEXTS_FILE = "data/authors.txt"
+TEXTS_FILE = "data/texts.txt"  # ✅ ИСПРАВЛЕНО
 QUESTIONS_FILE = "data/questions.txt"
 AUTHORS_FILE = "data/authors.txt"
 USERS_FILE = "data/users.json"
@@ -34,48 +34,12 @@ START_DATE = datetime(2025, 12, 8)
 TOTAL_DAYS = 21
 END_DATE = START_DATE + timedelta(days=TOTAL_DAYS - 1)
 SEND_TIME = "10:00"
+MOSCOW_TZ = pytz.timezone('Europe/Moscow')  # ✅ ДОБАВЛЕНО
 
-# Текст приветствия
-WELCOME_TEXT = """Добро пожаловать!
 
-Перед вами — литературно-детективный адвент-календарь🕵️
-
-Как он работает: 
-1. Каждый день вы получаете иллюстрацию с вопросом. 
-
-Это короткая рефлексия в форме «вопроса писателю». 
-
-2. После просмотра нажмите 
-
-«найти улику». 
-
-Бот пришлёт деталь, шифр или подсказку — один шаг в ежедневной цепочке загадок. 
-
-3. Все дни идут по порядку. Пропустили — сможете догнать. 
-
-4. В конце вас ждёт итоговое задание, где пригодятся все найденные улики и, конечно, ваша интуиция. 
-
-Держите глаза открытыми, отвечайте честно, собирайте детали — и наслаждайтесь атмосферой вместе с книжным клубом «Обещаю, завтра прочитаю!» (https://t.me/ricksschwifty)"""
-
-BACKSTORY_TEXT = """В закрытом клубе писателей должен был состояться аукцион редчайшей книги. Говорили, что она меняет судьбу того, кто её откроет…
-
-Впрочем, это лишь слухи. 
-
-Вечер обещал быть роскошным: шампанское, споры, блеск и лёгкое предновогоднее волнение. 
-
-Но в момент, когда ведущий снял вуаль с лота, гости замолкли: книга исчезла. 
-
-Теперь каждый взгляд — подозрение, каждый жест — возможная улика. 
-
-С этого момента вам предстоит расшифровывать намёки, задавать вопросы гостям и искать то, что спрятано между слов. 
-
-У вас есть 21 день, чтобы вернуть книгу. 
-
-И помните: в этом расследовании вы — не только наблюдатель. Вы один из тех, кто был в зале."""
-
+# ... (остальные функции загрузки данных остаются без изменений) ...
 
 def load_users():
-    """Загрузить список пользователей"""
     if os.path.exists(USERS_FILE):
         with open(USERS_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -83,49 +47,42 @@ def load_users():
 
 
 def save_users(users):
-    """Сохранить список пользователей"""
     os.makedirs(os.path.dirname(USERS_FILE), exist_ok=True)
     with open(USERS_FILE, 'w', encoding='utf-8') as f:
         json.dump(users, f, ensure_ascii=False, indent=2)
 
 
 def get_current_day():
-    """Получить текущий день адвент-календаря (1-21)"""
     now = datetime.now()
     delta = (now.date() - START_DATE.date()).days + 1
     if delta < 1:
-        return 0  # Календарь еще не начался
+        return 0
     if delta > TOTAL_DAYS:
-        return TOTAL_DAYS  # Календарь закончился
+        return TOTAL_DAYS
     return delta
 
 
 def load_clues():
-    """Загрузить улики из файла"""
     with open(CLUES_FILE, 'r', encoding='utf-8') as f:
         return [line.strip() for line in f.readlines() if line.strip()]
 
 
 def load_texts():
-    """Загрузить части текста из файла"""
     with open(TEXTS_FILE, 'r', encoding='utf-8') as f:
         return [line.strip() for line in f.readlines() if line.strip()]
 
 
 def load_questions():
-    """Загрузить вопросы из файла"""
     with open(QUESTIONS_FILE, 'r', encoding='utf-8') as f:
         return [line.strip() for line in f.readlines() if line.strip()]
 
 
 def load_authors():
-    """Загрузить авторов из файла"""
     with open(AUTHORS_FILE, 'r', encoding='utf-8') as f:
         return [line.strip() for line in f.readlines() if line.strip()]
 
 
 def get_clue(day: int) -> str:
-    """Получить улику для дня (day: 1-21)"""
     clues = load_clues()
     if 1 <= day <= len(clues):
         return clues[day - 1]
@@ -133,7 +90,6 @@ def get_clue(day: int) -> str:
 
 
 def get_text_part(day: int) -> str:
-    """Получить часть текста для дня (если день кратен 3)"""
     if day % 3 != 0:
         return None
     texts = load_texts()
@@ -144,7 +100,6 @@ def get_text_part(day: int) -> str:
 
 
 def get_question(day: int) -> str:
-    """Получить вопрос для дня"""
     questions = load_questions()
     if 1 <= day <= len(questions):
         return questions[day - 1]
@@ -152,7 +107,6 @@ def get_question(day: int) -> str:
 
 
 def get_author(day: int) -> str:
-    """Получить автора для дня"""
     authors = load_authors()
     if 1 <= day <= len(authors):
         return authors[day - 1]
@@ -160,15 +114,46 @@ def get_author(day: int) -> str:
 
 
 def get_image_path(day: int) -> str:
-    """Получить путь к картинке для дня"""
     image_path = os.path.join(IMAGES_DIR, f"{day}.jpg")
     if not os.path.exists(image_path):
         image_path = os.path.join(IMAGES_DIR, f"{day}.png")
     return image_path if os.path.exists(image_path) else None
 
 
+WELCOME_TEXT = """<b>Добро пожаловать!</b>
+
+Перед вами — литературно-детективный адвент-календарь🕵️
+
+<b>Как он работает:</b>
+
+📖 1. Каждый день вы получаете иллюстрацию с вопросом. 
+Это короткая рефлексия в форме «вопроса писателю». 
+
+🔎 2. После просмотра нажмите 
+«найти улику». 
+Бот пришлёт деталь, шифр или подсказку — один шаг в ежедневной цепочке загадок. 
+
+🗓️ 3. Все дни идут по порядку. Пропустили — сможете догнать. 
+
+🥂 4. В конце вас ждёт итоговое задание, где пригодятся все найденные улики и, конечно, ваша интуиция. 
+
+Держите глаза открытыми, отвечайте честно, собирайте детали — и наслаждайтесь атмосферой вместе с книжным клубом «Обещаю, завтра прочитаю!» (https://t.me/ricksschwifty)"""
+
+BACKSTORY_TEXT = """В закрытом клубе писателей должен был состояться аукцион редчайшей книги. Говорили, что она меняет судьбу того, кто её откроет… Впрочем, это лишь слухи.
+
+Вечер обещал быть роскошным: шампанское, споры, блеск и лёгкое предновогоднее волнение!
+Но в момент, когда ведущий снял вуаль с лота, гости замолкли: <b>книга исчезла</b>. 
+
+Теперь каждый взгляд — подозрение, каждый жест — возможная улика. 
+
+С этого момента вам предстоит расшифровывать намёки, задавать вопросы гостям и искать то, что спрятано между слов. 
+
+У вас есть 21 день, чтобы вернуть книгу. 
+
+И помните: в этом расследовании вы — не только наблюдатель. Вы один из тех, кто был в зале."""
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда /start"""
     user_id = str(update.effective_user.id)
     users = load_users()
 
@@ -176,27 +161,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         users[user_id] = {
             "joined_date": datetime.now().isoformat(),
             "current_day": 0,
-            "subscribed": False  # Еще не подписан
+            "subscribed": False
         }
         save_users(users)
 
-    # Первое приветственное сообщение с информацией
     keyboard = [[InlineKeyboardButton("Узнать предысторию", callback_data="backstory")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-
     await update.message.reply_text(WELCOME_TEXT, reply_markup=reply_markup, parse_mode="HTML")
 
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик нажатия кнопок"""
     query = update.callback_query
     user_id = str(query.from_user.id)
     users = load_users()
-
     data = query.data
 
     if data == "backstory":
-        # Показать предысторию с кнопкой присоединения
         keyboard = [[InlineKeyboardButton("Присоединяюсь", callback_data="subscribe")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.answer()
@@ -207,16 +187,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif data == "subscribe":
-        # Подписать пользователя на рассылку
         if user_id in users:
             users[user_id]["subscribed"] = True
             save_users(users)
 
         await query.answer("✅ Вы подписаны! Начинайте расследование!", show_alert=True)
 
-        # Отправить историю, если она доступна
         current_day = get_current_day()
-        if current_day > 1:
+        if current_day >= 1:  # ✅ ИСПРАВЛЕНО: было > 1
             await query.edit_message_text(
                 text="📖 Загружаю для вас всю историю до текущего момента...",
                 reply_markup=None
@@ -233,21 +211,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
     elif data.startswith("clue_"):
-        # Обработка улики
+        # ✅ ИСПРАВЛЕНО: не удаляем кнопки
         day = int(data.split("_")[1])
         clue = get_clue(day)
         await query.answer()
-        await query.edit_message_reply_markup(reply_markup=None)
         await query.message.reply_text(f"🔍 <b>Улика дня {day}:</b>\n\n{clue}", parse_mode="HTML")
 
+    # ✅ ДОБАВЛЕНО: обработчик кнопки "Вопрос"
+    elif data.startswith("question_"):
+        day = int(data.split("_")[1])
+        question = get_question(day)
+        await query.answer(f"❓ {question}", show_alert=True)
+
     elif data.startswith("text_"):
-        # Обработка части текста
         day = int(data.split("_")[1])
         text_part = get_text_part(day)
         if text_part:
             part_num = day // 3
             await query.answer()
-            await query.edit_message_reply_markup(reply_markup=None)
             await query.message.reply_text(
                 f"📖 <b>Часть текста {part_num}:</b>\n\n{text_part}",
                 parse_mode="HTML"
@@ -257,31 +238,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def send_daily_message(chat_id: int, day: int, context: ContextTypes.DEFAULT_TYPE):
-    """Отправить ежедневное сообщение для конкретного дня"""
     if day < 1 or day > TOTAL_DAYS:
         return
 
     image_path = get_image_path(day)
-    question = get_question(day)
     author = get_author(day)
 
-    # Подпись к картинке: "ДЕНЬ n - <автор>"
-    caption = f"<b>ДЕНЬ {day} - {author}</b>\n\n❓ {question}"
+    # ✅ ИЗМЕНЕНО: убрали вопрос из caption
+    caption = f"<b>ДЕНЬ {day} - {author}</b>"
 
-    # Создаем кнопку улики
-    clue_button = InlineKeyboardButton(
-        "🔍 Найти улику",
-        callback_data=f"clue_{day}"
-    )
+    # ✅ ДОБАВЛЕНО: две кнопки в одном ряду
+    clue_button = InlineKeyboardButton("🔍 Найти улику", callback_data=f"clue_{day}")
+    question_button = InlineKeyboardButton("❓ Вопрос", callback_data=f"question_{day}")
 
-    buttons = [[clue_button]]
+    buttons = [[clue_button, question_button]]
 
-    # Добавляем кнопку текста, если день кратен 3
+    # Кнопка текста на каждый третий день
     if day % 3 == 0:
-        text_button = InlineKeyboardButton(
-            "📖 Часть текста",
-            callback_data=f"text_{day}"
-        )
+        text_button = InlineKeyboardButton("📖 Часть текста", callback_data=f"text_{day}")
         buttons.append([text_button])
 
     keyboard = InlineKeyboardMarkup(buttons)
@@ -308,7 +282,6 @@ async def send_daily_message(chat_id: int, day: int, context: ContextTypes.DEFAU
 
 
 async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда /история - отправить все прошлые материалы"""
     current_day = get_current_day()
 
     if current_day == 0:
@@ -335,11 +308,10 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда /help"""
     help_text = (
         "🎄 <b>Команды адвент-календаря:</b>\n\n"
         "/start - Начать работу с ботом\n"
-        "/история - Получить все прошлые материалы\n"
+        "/histroy - Получить все прошлые материалы\n"
         "/help - Справка\n\n"
         "Каждый день в 10:00 МСК ты получишь новый материал!"
     )
@@ -347,7 +319,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def daily_task(context: ContextTypes.DEFAULT_TYPE):
-    """Ежедневная задача - отправить сообщения всем подписанным пользователям"""
     current_day = get_current_day()
 
     if current_day < 1 or current_day > TOTAL_DAYS:
@@ -357,7 +328,6 @@ async def daily_task(context: ContextTypes.DEFAULT_TYPE):
     failed_users = []
 
     for user_id, user_data in users.items():
-        # Отправляем только подписанным пользователям
         if not user_data.get("subscribed", False):
             continue
 
@@ -375,8 +345,6 @@ async def daily_task(context: ContextTypes.DEFAULT_TYPE):
 
 
 def main():
-    """Основная функция"""
-    # Проверка файлов
     required_files = [CLUES_FILE, TEXTS_FILE, QUESTIONS_FILE, AUTHORS_FILE]
     for file in required_files:
         if not os.path.exists(file):
@@ -387,22 +355,18 @@ def main():
         print(f"❌ Ошибка: папка {IMAGES_DIR} не найдена!")
         return
 
-    # Создание приложения
     application = Application.builder().token(TOKEN).build()
 
-    # Обработчики команд
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("история", history))
+    application.add_handler(CommandHandler("history", history))
     application.add_handler(CommandHandler("help", help_command))
-
-    # Обработчик кнопок
     application.add_handler(CallbackQueryHandler(button_handler))
 
-    # Ежедневная задача в 10:00 МСК
+    # ✅ ИСПРАВЛЕНО: добавлен часовой пояс МСК
     job_queue = application.job_queue
     job_queue.run_daily(
         daily_task,
-        time=datetime.strptime("10:00", "%H:%M").time(),
+        time=time(hour=10, minute=0, tzinfo=MOSCOW_TZ),
         name="daily_advent"
     )
 
