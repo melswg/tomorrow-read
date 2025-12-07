@@ -332,11 +332,29 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ История загружена!")
 
 
+async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Проверяет, участвует ли пользователь в Адвент-календаре (есть ли он в users.json).
+    """
+    user_id = str(update.effective_user.id)
+    users = load_users()
+
+    if user_id in users and users[user_id].get("subscribed", False):
+        message = "🎉 **Поздравляем!** Вы участвуете в адвент-календаре и подписаны на ежедневные обновления!"
+    elif user_id in users and not users[user_id].get("subscribed", False):
+        message = "✅ Вы начинали участие в адвент-календаре, но не подписались на ежедневные обновления. Нажмите /start, чтобы открыть приветственное сообщение, затем нажмите кнопку 'Узнать предысторию', в следующем сообщении нажмите 'Присоединяюсь'."
+    else:
+        message = "❌ Вы пока не участвуете в адвент-календаре. Нажмите /start, чтобы начать расследование!"
+
+    await update.message.reply_text(message, parse_mode="Markdown")
+
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = (
         "🎄 <b>Команды адвент-календаря:</b>\n\n"
         "/start - Начать работу с ботом\n"
         "/history - Получить все прошлые материалы\n"
+        "/check - Проверить свое участие\n"
         "/help - Справка\n\n"
         "Каждый день в 10:00 МСК ты получишь новый материал!"
     )
@@ -386,6 +404,7 @@ def main():
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("history", history))
+    application.add_handler(CommandHandler("check", check))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CallbackQueryHandler(button_handler))
 
