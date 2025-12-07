@@ -16,7 +16,7 @@ import pytz
 TEST_MODE = False
 
 # Конфигурация
-TOKEN = "8471745790:AAFZIf47RHjj0adBiuIAlL_06hioSipVAYA"
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 IMAGES_DIR = "data/images"
 CLUES_FILE = "data/clues.txt"
 TEXTS_FILE = "data/texts.txt"
