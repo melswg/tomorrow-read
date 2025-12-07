@@ -13,11 +13,13 @@ import json
 import asyncio
 import pytz
 
+TEST_MODE = False
+
 # Конфигурация
 TOKEN = "8471745790:AAFZIf47RHjj0adBiuIAlL_06hioSipVAYA"
 IMAGES_DIR = "data/images"
 CLUES_FILE = "data/clues.txt"
-TEXTS_FILE = "data/texts.txt"  # ✅ ИСПРАВЛЕНО
+TEXTS_FILE = "data/texts.txt"
 QUESTIONS_FILE = "data/questions.txt"
 AUTHORS_FILE = "data/authors.txt"
 USERS_FILE = "data/users.json"
@@ -30,14 +32,16 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Константы
-START_DATE = datetime(2025, 12, 8)
+if TEST_MODE:
+    START_DATE = datetime.now()
+    logger.warning("ТЕСТОВЫЙ РЕЖИМ! Каждая минута = 1 день")
+else:
+    START_DATE = datetime(2025, 12, 8)
+
 TOTAL_DAYS = 21
 END_DATE = START_DATE + timedelta(days=TOTAL_DAYS - 1)
-SEND_TIME = "10:00"
-MOSCOW_TZ = pytz.timezone('Europe/Moscow')  # ✅ ДОБАВЛЕНО
+MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 
-
-# ... (остальные функции загрузки данных остаются без изменений) ...
 
 def load_users():
     if os.path.exists(USERS_FILE):
@@ -53,8 +57,17 @@ def save_users(users):
 
 
 def get_current_day():
+    """Получить текущий день адвент-календаря (1-21)"""
     now = datetime.now()
-    delta = (now.date() - START_DATE.date()).days + 1
+
+    if TEST_MODE:
+        #ТЕСТОВЫЙ РЕЖИМ: каждая минута = 1 день
+        delta = int((now - START_DATE).total_seconds() // 60) + 1
+        logger.info(f"Текущая минута с начала: {delta - 1}, День: {delta}")
+    else:
+        # Обычный режим: каждый день = 1 день
+        delta = (now.date() - START_DATE.date()).days + 1
+
     if delta < 1:
         return 0
     if delta > TOTAL_DAYS:
@@ -71,7 +84,6 @@ def load_texts():
     """Загрузить части текста из файла (разделенные по ---)"""
     with open(TEXTS_FILE, 'r', encoding='utf-8') as f:
         content = f.read()
-    # Разделяем по "---" для многострочных блоков
     return [text.strip() for text in content.split('---') if text.strip()]
 
 
@@ -123,8 +135,6 @@ def get_image_path(day: int) -> str:
     return image_path if os.path.exists(image_path) else None
 
 
-# ... (команды start, WELCOME_TEXT и BACKSTORY_TEXT остаются без изменений) ...
-
 WELCOME_TEXT = """<b>Добро пожаловать!</b>
 
 Перед вами — литературно-детективный адвент-календарь🕵️
@@ -173,7 +183,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("Узнать предысторию", callback_data="backstory")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # ✅ ИЗМЕНЕНО: просто текст без фото
     await update.message.reply_text(WELCOME_TEXT, reply_markup=reply_markup, parse_mode="HTML")
 
 
@@ -187,11 +196,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [[InlineKeyboardButton("Присоединяюсь", callback_data="subscribe")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        # ✅ ДОБАВЛЕНО: убираем кнопку из первого сообщения
         await query.edit_message_reply_markup(reply_markup=None)
         await query.answer()
 
-        # ✅ ИЗМЕНЕНО: отправляем фото с предысторией
         backstory_image = "data/images/welcome.jpg"
 
         if os.path.exists(backstory_image):
@@ -203,7 +210,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parse_mode="HTML"
                 )
         else:
-            # Если нет фото - просто текст
             await query.message.reply_text(
                 text=BACKSTORY_TEXT,
                 reply_markup=reply_markup,
@@ -218,7 +224,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("✅ Вы подписаны! Начинайте расследование!", show_alert=True)
 
         current_day = get_current_day()
-        if current_day >= 1:  # ✅ ИСПРАВЛЕНО: было > 1
+        if current_day >= 1:
             await query.edit_message_text(
                 text="📖 Загружаю для вас всю историю до текущего момента...",
                 reply_markup=None
@@ -235,13 +241,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
     elif data.startswith("clue_"):
-        # ✅ ИСПРАВЛЕНО: не удаляем кнопки
+        # ✅ ИСПРАВЛЕНО: показываем улику во всплывающем окне
         day = int(data.split("_")[1])
         clue = get_clue(day)
-        await query.answer()
-        await query.message.reply_text(f"🔍 <b>Улика дня {day}:</b>\n\n{clue}", parse_mode="HTML")
+        await query.answer(f"🔍 Улика дня {day}:\n\n{clue}", show_alert=True)
 
-    # ✅ ДОБАВЛЕНО: обработчик кнопки "Вопрос"
     elif data.startswith("question_"):
         day = int(data.split("_")[1])
         question = get_question(day)
@@ -268,16 +272,13 @@ async def send_daily_message(chat_id: int, day: int, context: ContextTypes.DEFAU
     image_path = get_image_path(day)
     author = get_author(day)
 
-    # ✅ ИЗМЕНЕНО: убрали вопрос из caption
     caption = f"<b>ДЕНЬ {day} - {author}</b>"
 
-    # ✅ ДОБАВЛЕНО: две кнопки в одном ряду
     clue_button = InlineKeyboardButton("🔍 Найти улику", callback_data=f"clue_{day}")
     question_button = InlineKeyboardButton("❓ Вопрос", callback_data=f"question_{day}")
 
     buttons = [[clue_button, question_button]]
 
-    # Кнопка текста на каждый третий день
     if day % 3 == 0:
         text_button = InlineKeyboardButton("📖 Часть текста", callback_data=f"text_{day}")
         buttons.append([text_button])
@@ -312,17 +313,15 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⏳ Календарь еще не начался!")
         return
 
-    if current_day > TOTAL_DAYS:
-        start_day = 1
-        end_day = TOTAL_DAYS
-        await update.message.reply_text(f"📖 Отправляю все {TOTAL_DAYS} дней...")
-    else:
-        start_day = 1
-        end_day = current_day - 1
-        if end_day < start_day:
-            await update.message.reply_text("📍 Сегодня первый день! Нечего отправлять.")
-            return
-        await update.message.reply_text(f"📖 Отправляю материалы с 1 по {end_day} день...")
+    # ✅ ИСПРАВЛЕНО: всегда отправляем только прошедшие дни
+    start_day = 1
+    end_day = current_day - 1
+
+    if end_day < start_day:
+        await update.message.reply_text("📍 Сегодня первый день! Нечего отправлять.")
+        return
+
+    await update.message.reply_text(f"📖 Отправляю материалы с 1 по {end_day} день...")
 
     for day in range(start_day, end_day + 1):
         await send_daily_message(update.effective_chat.id, day, context)
@@ -358,6 +357,8 @@ async def daily_task(context: ContextTypes.DEFAULT_TYPE):
         try:
             await send_daily_message(int(user_id), current_day, context)
             logger.info(f"Отправлено сообщение пользователю {user_id} на день {current_day}")
+            # ✅ ДОБАВЛЕНО: задержка между отправками пользователям
+            await asyncio.sleep(0.3)
         except TelegramError as e:
             logger.error(f"Ошибка отправки пользователю {user_id}: {e}")
             failed_users.append(user_id)
@@ -386,13 +387,26 @@ def main():
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CallbackQueryHandler(button_handler))
 
-    # ✅ ИСПРАВЛЕНО: добавлен часовой пояс МСК
+    # Планировщик
     job_queue = application.job_queue
-    job_queue.run_daily(
-        daily_task,
-        time=time(hour=10, minute=0, tzinfo=MOSCOW_TZ),
-        name="daily_advent"
-    )
+
+    if TEST_MODE:
+        #ТЕСТОВЫЙ РЕЖИМ: каждую минуту
+        job_queue.run_repeating(
+            daily_task,
+            interval=60,  # Каждые 60 секунд
+            first=10,  # Первый запуск через 10 секунд
+            name="daily_advent"
+        )
+        logger.warning("🧪 ТЕСТОВЫЙ РЕЖИМ: Отправка каждую минуту!")
+    else:
+        # Обычный режим: каждый день в 10:00 МСК
+        job_queue.run_daily(
+            daily_task,
+            time=time(hour=10, minute=0, tzinfo=MOSCOW_TZ),
+            name="daily_advent"
+        )
+        logger.info("✅ Планировщик: Отправка каждый день в 10:00 МСК")
 
     logger.info("✅ Бот запущен!")
     application.run_polling()
