@@ -10,7 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Создание папок для данных
-RUN mkdir -p data/images downloads
+RUN mkdir -p assets/images downloads
 
 # Команда запуска
 CMD ["python", "bot.py"]

@@ -19,11 +19,11 @@ TEST_MODE = False
 
 # Конфигурация
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-IMAGES_DIR = "data/images"
-CLUES_FILE = "data/clues.txt"
-TEXTS_FILE = "data/texts.txt"
-QUESTIONS_FILE = "data/questions.txt"
-AUTHORS_FILE = "data/authors.txt"
+IMAGES_DIR = "assets/images"
+CLUES_FILE = "assets/clues.txt"
+TEXTS_FILE = "assets/texts.txt"
+QUESTIONS_FILE = "assets/questions.txt"
+AUTHORS_FILE = "assets/authors.txt"
 USERS_FILE = "data/users.json"
 
 # Логирование
@@ -201,7 +201,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_reply_markup(reply_markup=None)
         await query.answer()
 
-        backstory_image = "data/images/welcome.jpg"
+        backstory_image = "assets/images/welcome.jpg"
 
         if os.path.exists(backstory_image):
             with open(backstory_image, 'rb') as photo:
