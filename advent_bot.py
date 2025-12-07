@@ -68,8 +68,11 @@ def load_clues():
 
 
 def load_texts():
+    """Загрузить части текста из файла (разделенные по ---)"""
     with open(TEXTS_FILE, 'r', encoding='utf-8') as f:
-        return [line.strip() for line in f.readlines() if line.strip()]
+        content = f.read()
+    # Разделяем по "---" для многострочных блоков
+    return [text.strip() for text in content.split('---') if text.strip()]
 
 
 def load_questions():
@@ -120,6 +123,8 @@ def get_image_path(day: int) -> str:
     return image_path if os.path.exists(image_path) else None
 
 
+# ... (команды start, WELCOME_TEXT и BACKSTORY_TEXT остаются без изменений) ...
+
 WELCOME_TEXT = """<b>Добро пожаловать!</b>
 
 Перед вами — литературно-детективный адвент-календарь🕵️
@@ -133,7 +138,7 @@ WELCOME_TEXT = """<b>Добро пожаловать!</b>
 «найти улику». 
 Бот пришлёт деталь, шифр или подсказку — один шаг в ежедневной цепочке загадок. 
 
-🗓️ 3. Все дни идут по порядку. Пропустили — сможете догнать. 
+🗓 3. Все дни идут по порядку. Пропустили — сможете догнать. 
 
 🥂 4. В конце вас ждёт итоговое задание, где пригодятся все найденные улики и, конечно, ваша интуиция. 
 
@@ -150,7 +155,7 @@ BACKSTORY_TEXT = """В закрытом клубе писателей долже
 
 У вас есть 21 день, чтобы вернуть книгу. 
 
-И помните: в этом расследовании вы — не только наблюдатель. Вы один из тех, кто был в зале."""
+И помните: в этом расследовании вы — не только наблюдатель. <i>Вы один из тех, кто был в зале.</i>"""
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -167,6 +172,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [[InlineKeyboardButton("Узнать предысторию", callback_data="backstory")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # ✅ ИЗМЕНЕНО: просто текст без фото
     await update.message.reply_text(WELCOME_TEXT, reply_markup=reply_markup, parse_mode="HTML")
 
 
@@ -179,12 +186,29 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "backstory":
         keyboard = [[InlineKeyboardButton("Присоединяюсь", callback_data="subscribe")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
+
+        # ✅ ДОБАВЛЕНО: убираем кнопку из первого сообщения
+        await query.edit_message_reply_markup(reply_markup=None)
         await query.answer()
-        await query.edit_message_text(
-            text=BACKSTORY_TEXT,
-            reply_markup=reply_markup,
-            parse_mode="HTML"
-        )
+
+        # ✅ ИЗМЕНЕНО: отправляем фото с предысторией
+        backstory_image = "data/images/welcome.jpg"
+
+        if os.path.exists(backstory_image):
+            with open(backstory_image, 'rb') as photo:
+                await query.message.reply_photo(
+                    photo=photo,
+                    caption=BACKSTORY_TEXT,
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
+        else:
+            # Если нет фото - просто текст
+            await query.message.reply_text(
+                text=BACKSTORY_TEXT,
+                reply_markup=reply_markup,
+                parse_mode="HTML"
+            )
 
     elif data == "subscribe":
         if user_id in users:
@@ -311,7 +335,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = (
         "🎄 <b>Команды адвент-календаря:</b>\n\n"
         "/start - Начать работу с ботом\n"
-        "/histroy - Получить все прошлые материалы\n"
+        "/history - Получить все прошлые материалы\n"
         "/help - Справка\n\n"
         "Каждый день в 10:00 МСК ты получишь новый материал!"
     )
