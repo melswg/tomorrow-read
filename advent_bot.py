@@ -8,6 +8,8 @@ from telegram.ext import (
 )
 from telegram.error import TelegramError
 import os
+from dotenv import load_dotenv
+load_dotenv()
 from datetime import datetime, timedelta, time
 import json
 import asyncio
