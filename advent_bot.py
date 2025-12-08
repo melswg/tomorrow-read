@@ -331,11 +331,7 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     start_day = 1
-    end_day = current_day - 1
-
-    if end_day < start_day:
-        await update.message.reply_text("📍 Сегодня первый день! Нечего отправлять.")
-        return
+    end_day = current_day
 
     await update.message.reply_text(f"📖 Отправляю материалы с 1 по {end_day} день...")
 
