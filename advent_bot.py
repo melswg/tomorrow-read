@@ -152,7 +152,7 @@ WELCOME_TEXT = """<b>Добро пожаловать!</b>
 
 🗓 3. Все дни идут по порядку. Пропустили — сможете догнать. 
 
-🥂 4. В конце вас ждёт итоговое задание, где пригодятся все найденные улики и, конечно, ваша интуиция. 
+🥂 4. В финале вас ждёт развязка — и именно ваши собранные улики сложатся в одно большое новогоднее откровение!
 
 Держите глаза открытыми, отвечайте честно, собирайте детали — и наслаждайтесь атмосферой вместе с книжным клубом «Обещаю, завтра прочитаю!» (https://t.me/ricksschwifty)"""
 
@@ -243,7 +243,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
     elif data.startswith("clue_"):
-        # ✅ ИСПРАВЛЕНО: показываем улику во всплывающем окне
         day = int(data.split("_")[1])
         clue = get_clue(day)
         await query.answer(f"🔍 Улика дня {day}:\n\n{clue}", show_alert=True)
@@ -259,10 +258,26 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if text_part:
             part_num = day // 3
             await query.answer()
-            await query.message.reply_text(
-                f"📖 <b>Часть текста {part_num}:</b>\n\n{text_part}",
-                parse_mode="HTML"
-            )
+            if day == 21:
+                final_image = os.path.join(IMAGES_DIR, "final.jpg")
+
+                if os.path.exists(final_image):
+                    with open(final_image, 'rb') as photo:
+                        await query.message.reply_photo(
+                            photo=photo,
+                            caption=f"📖 <b>Часть текста {part_num}:</b>\n\n{text_part}",
+                            parse_mode="HTML"
+                        )
+                else:
+                    await query.message.reply_text(
+                        f"📖 <b>Часть текста {part_num}:</b>\n\n{text_part}",
+                        parse_mode="HTML"
+                    )
+            else:
+                await query.message.reply_text(
+                    f"📖 <b>Часть текста {part_num}:</b>\n\n{text_part}",
+                    parse_mode="HTML"
+                )
         else:
             await query.answer("❌ Часть текста не найдена", show_alert=True)
 
@@ -315,7 +330,6 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⏳ Календарь еще не начался!")
         return
 
-    # ✅ ИСПРАВЛЕНО: всегда отправляем только прошедшие дни
     start_day = 1
     end_day = current_day - 1
 
@@ -377,7 +391,6 @@ async def daily_task(context: ContextTypes.DEFAULT_TYPE):
         try:
             await send_daily_message(int(user_id), current_day, context)
             logger.info(f"Отправлено сообщение пользователю {user_id} на день {current_day}")
-            # ✅ ДОБАВЛЕНО: задержка между отправками пользователям
             await asyncio.sleep(0.3)
         except TelegramError as e:
             logger.error(f"Ошибка отправки пользователю {user_id}: {e}")
