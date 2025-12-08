@@ -236,11 +236,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Отправить ТОЛЬКО текущий день
         await send_daily_message(query.message.chat_id, current_day, context)
-        if (current_day != START_DATE):
-            await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text="✅ Готово! Используй /history, чтобы получить все прошлые материалы."
-            )
+
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="✅ Готово! Используй /history, чтобы получить все прошлые материалы."
+        )
 
     elif data.startswith("clue_"):
         day = int(data.split("_")[1])
