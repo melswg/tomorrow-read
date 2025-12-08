@@ -9,7 +9,6 @@ from telegram.ext import (
 from telegram.error import TelegramError
 import os
 from dotenv import load_dotenv
-
 load_dotenv()
 from datetime import datetime, timedelta, time
 import json
@@ -64,7 +63,7 @@ def get_current_day():
     now = datetime.now()
 
     if TEST_MODE:
-        # ТЕСТОВЫЙ РЕЖИМ: каждая минута = 1 день
+        #ТЕСТОВЫЙ РЕЖИМ: каждая минута = 1 день
         delta = int((now - START_DATE).total_seconds() // 60) + 1
         logger.info(f"Текущая минута с начала: {delta - 1}, День: {delta}")
     else:
@@ -174,12 +173,11 @@ BACKSTORY_TEXT = """В закрытом клубе писателей долже
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     users = load_users()
-    current_day = get_current_day()
 
     if user_id not in users:
         users[user_id] = {
             "joined_date": datetime.now().isoformat(),
-            "current_day": current_day,  # Запомнить день присоединения
+            "current_day": 0,
             "subscribed": False
         }
         save_users(users)
@@ -221,26 +219,28 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
     elif data == "subscribe":
-        current_day = get_current_day()
-
         if user_id in users:
             users[user_id]["subscribed"] = True
             save_users(users)
 
         await query.answer("✅ Вы подписаны! Начинайте расследование!", show_alert=True)
-        await query.edit_message_text(
-            text="📖 Загружаю сообщение дня...",
-            reply_markup=None
-        )
-        await asyncio.sleep(0.5)
 
-        # Отправить ТОЛЬКО текущий день
-        await send_daily_message(query.message.chat_id, current_day, context)
+        current_day = get_current_day()
+        if current_day >= 1:
+            await query.edit_message_text(
+                text="📖 Загружаю для вас всю историю до текущего момента...",
+                reply_markup=None
+            )
+            await asyncio.sleep(0.5)
 
-        await context.bot.send_message(
-            chat_id=query.message.chat_id,
-            text="✅ Готово! Используй /history, чтобы получить все прошлые материалы."
-        )
+            for day in range(1, current_day):
+                await send_daily_message(query.message.chat_id, day, context)
+                await asyncio.sleep(0.5)
+
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text="✅ История загружена! Теперь ты в курсе всех событий."
+            )
 
     elif data.startswith("clue_"):
         day = int(data.split("_")[1])
@@ -421,7 +421,7 @@ def main():
     job_queue = application.job_queue
 
     if TEST_MODE:
-        # ТЕСТОВЫЙ РЕЖИМ: каждую минуту
+        #ТЕСТОВЫЙ РЕЖИМ: каждую минуту
         job_queue.run_repeating(
             daily_task,
             interval=60,  # Каждые 60 секунд
